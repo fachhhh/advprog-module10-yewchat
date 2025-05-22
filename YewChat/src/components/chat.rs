@@ -92,10 +92,10 @@ impl Component for Chat {
                             .map(|u| UserProfile {
                                 name: u.into(),
                                 avatar: format!(
-                                    "https://avatars.dicebear.com/api/adventurer-neutral/{}.svg",
+                                    "https://api.dicebear.com/8.x/adventurer-neutral/svg?seed={}",
                                     u
                                 )
-                                .into(),
+                                    .into(),
                             })
                             .collect();
                         return true;
@@ -130,66 +130,195 @@ impl Component for Chat {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let submit = ctx.link().callback(|_| Msg::SubmitMessage);
+        let (cur_user, _) = ctx.link().context::<User>(Callback::noop()).expect("Context to be set");
+        let cur_username = cur_user.username.borrow().clone();
+
         html! {
-            <div class="flex w-screen">
-                <div class="flex-none w-56 h-screen bg-gray-100">
-                    <div class="text-xl p-3">{"Users"}</div>
-                    {
-                        self.users.clone().iter().map(|u| {
-                            html!{
-                                <div class="flex m-3 bg-white rounded-lg p-2">
-                                    <div>
-                                        <img class="w-12 h-12 rounded-full" src={u.avatar.clone()} alt="avatar"/>
-                                    </div>
-                                    <div class="flex-grow p-3">
-                                        <div class="flex text-xs justify-between">
-                                            <div>{u.name.clone()}</div>
+            <div class="fixed inset-0 w-full h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex relative overflow-hidden">
+                // Background decorative elements
+                <div class="absolute inset-0 bg-black opacity-30"></div>
+                <div class="absolute top-20 left-20 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse"></div>
+                <div class="absolute top-40 right-32 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse animation-delay-2000"></div>
+                <div class="absolute -bottom-8 left-40 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse animation-delay-4000"></div>
+
+                // Users Sidebar
+                <div class="relative z-10 flex-none w-80 h-full bg-white/5 backdrop-blur-lg border-r border-white/10">
+                    <div class="p-6 border-b border-white/10">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-bold text-white">{"Online Users"}</h2>
+                                <p class="text-sm text-gray-300">{format!("{} users online", self.users.len())}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 space-y-3 overflow-y-auto h-full">
+                        {
+                            self.users.clone().iter().map(|u| {
+                                let is_current_user = u.name == cur_username;
+                                let bg_color = if is_current_user { "bg-green-500/20 border-green-400/50" } else { "bg-white/5 hover:bg-white/10 border-white/5 hover:border-white/20" };
+                                let text_color = if is_current_user { "text-green-300" } else { "text-white group-hover:text-purple-300" };
+
+                                html!{
+                                    <div class={format!("group flex items-center space-x-3 {} rounded-xl p-3 transition-all duration-300 cursor-pointer border", bg_color)}>
+                                        <div class="relative">
+                                            <img class="w-12 h-12 rounded-full ring-2 ring-purple-500/50 shadow-lg" src={u.avatar.clone()} alt="avatar"/>
+                                            <div class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
                                         </div>
-                                        <div class="text-xs text-gray-400">
-                                            {"Hi there!"}
+                                        <div class="flex-grow">
+                                            <div class={format!("font-medium transition-colors {}", text_color)}>
+                                                {u.name.clone()}
+                                                if is_current_user {
+                                                    {" (You)"}
+                                                }
+                                            </div>
+                                            <div class="text-xs text-gray-400">
+                                                {"Active now"}
+                                            </div>
                                         </div>
+                                        <div class="w-2 h-2 bg-purple-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                     </div>
-                                </div>
-                            }
-                        }).collect::<Html>()
-                    }
+                                }
+                            }).collect::<Html>()
+                        }
+                    </div>
                 </div>
-                <div class="grow h-screen flex flex-col">
-                    <div class="w-full h-14 border-b-2 border-gray-300"><div class="text-xl p-3">{"💬 Chat!"}</div></div>
-                    <div class="w-full grow overflow-auto border-b-2 border-gray-300">
+
+                // Chat Area
+                <div class="relative z-10 flex-grow h-full flex flex-col bg-white/5 backdrop-blur-lg">
+                    // Chat Header
+                    <div class="flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.862 9.862 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h1 class="text-2xl font-bold text-white">{"Global Chat"}</h1>
+                                <p class="text-sm text-gray-300">{"Connect with everyone"}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                            <span class="text-sm text-gray-300">{"Connected"}</span>
+                        </div>
+                    </div>
+
+                    // Messages Area
+                    <div class="flex-grow overflow-y-auto p-6 space-y-4">
                         {
                             self.messages.iter().map(|m| {
                                 let user = self.users.iter().find(|u| u.name == m.from).unwrap();
-                                html!{
-                                    <div class="flex items-end w-3/6 bg-gray-100 m-8 rounded-tl-lg rounded-tr-lg rounded-br-lg ">
-                                        <img class="w-8 h-8 rounded-full m-3" src={user.avatar.clone()} alt="avatar"/>
-                                        <div class="p-3">
-                                            <div class="text-sm">
-                                                {m.from.clone()}
-                                            </div>
-                                            <div class="text-xs text-gray-500">
-                                                if m.message.ends_with(".gif") {
-                                                    <img class="mt-3" src={m.message.clone()}/>
-                                                } else {
-                                                    {m.message.clone()}
+                                let is_current_user = user.name == cur_username;
+                                let message_container_class = if is_current_user {
+                                    "flex justify-end" // Ini akan mendorong pesan ke kanan
+                                } else {
+                                    "flex justify-start" // Ini akan memposisikan pesan di kiri
+                                };
+                                let bubble_color = if is_current_user {
+                                    "bg-green-500/20 border-green-400/30"
+                                } else {
+                                    "bg-white/10 border-white/10"
+                                };
+                                let bubble_rounding = if is_current_user {
+                                    "rounded-2xl rounded-tr-none"
+                                } else {
+                                    "rounded-2xl rounded-tl-none"
+                                };
+                                let name_color = if is_current_user {
+                                    "text-green-300"
+                                } else {
+                                    "text-purple-300"
+                                };
+
+                                html! {
+                                    <div class={message_container_class}>
+                                        <div class={format!("flex items-start space-x-3 max-w-4xl")}>
+                                            {if !is_current_user {
+                                                html! {
+                                                    <img class="w-10 h-10 rounded-full ring-2 ring-purple-500/30 shadow-lg flex-shrink-0"
+                                                        src={user.avatar.clone()} alt="avatar"/>
                                                 }
+                                            } else {
+                                                html! {}
+                                            }}
+                                            <div class={format!("flex flex-col {}", if is_current_user { "items-end" } else { "items-start" })}>
+                                                <div class={format!("backdrop-blur-sm p-4 border shadow-lg {} {}", bubble_color, bubble_rounding)}>
+                                                    <div class="flex items-center space-x-2 mb-2">
+                                                        <span class={format!("text-sm font-semibold {}", name_color)}>
+                                                            {m.from.clone()}
+                                                            if is_current_user {
+                                                                {" (You)"}
+                                                            }
+                                                        </span>
+                                                        <span class="text-xs text-gray-400">
+                                                            {"just now"}
+                                                        </span>
+                                                    </div>
+                                                    <div class="text-white">
+                                                        if m.message.ends_with(".gif") {
+                                                            <img class="mt-2 rounded-lg max-w-xs shadow-lg" src={m.message.clone()}/>
+                                                        } else {
+                                                            <p class="break-words">{m.message.clone()}</p>
+                                                        }
+                                                    </div>
+                                                </div>
                                             </div>
+                                            {if is_current_user {
+                                                html! {
+                                                    <img class="w-10 h-10 rounded-full ring-2 ring-purple-500/30 shadow-lg flex-shrink-0"
+                                                        src={user.avatar.clone()} alt="avatar"/>
+                                                }
+                                            } else {
+                                                html! {}
+                                            }}
                                         </div>
                                     </div>
                                 }
                             }).collect::<Html>()
                         }
-
                     </div>
-                    <div class="w-full h-14 flex px-3 items-center">
-                        <input ref={self.chat_input.clone()} type="text" placeholder="Message" class="block w-full py-2 pl-4 mx-3 bg-gray-100 rounded-full outline-none focus:text-gray-700" name="message" required=true />
-                        <button onclick={submit} class="p-3 shadow-sm bg-blue-600 w-10 h-10 rounded-full flex justify-center items-center color-white">
-                            <svg fill="#000000" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="fill-white">
-                                <path d="M0 0h24v24H0z" fill="none"></path><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
-                            </svg>
-                        </button>
+
+                    // Message Input
+                    <div class="p-6 border-t border-white/10 bg-white/5">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-grow relative">
+                                <input
+                                    ref={self.chat_input.clone()}
+                                    type="text"
+                                    placeholder="Type your message..."
+                                    class="w-full py-4 pl-6 pr-16 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-sm transition-all duration-300 hover:bg-white/20"
+                                    name="message"
+                                    required=true
+                                />
+                                <div class="absolute inset-y-0 right-0 flex items-center pr-4">
+                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2M7 4h10M7 4l-4 4v10a2 2 0 002 2h14a2 2 0 002-2V8l-4-4"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <button
+                                onclick={submit}
+                                class="p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center group"
+                            >
+                                <svg class="w-6 h-6 text-white group-hover:rotate-45 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
+
+                // Floating decorative elements
+                <div class="absolute top-1/4 right-8 w-4 h-4 bg-purple-500 rounded-full opacity-60 animate-ping"></div>
+                <div class="absolute top-3/4 left-8 w-3 h-3 bg-blue-500 rounded-full opacity-60 animate-ping animation-delay-1000"></div>
+                <div class="absolute bottom-1/4 right-1/4 w-2 h-2 bg-indigo-500 rounded-full opacity-60 animate-bounce"></div>
             </div>
         }
     }
